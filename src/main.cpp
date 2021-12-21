@@ -1,3 +1,4 @@
+#include "tabulate.hpp"
 #include "argparse.hpp"
 #include <filesystem>
 #include <iostream>
@@ -8,6 +9,8 @@
 #include <chrono>
 
 using namespace std;
+using namespace tabulate;
+using Row_t = Table::Row_t;
 
 #ifdef _WIN32
  // clear console
@@ -75,7 +78,7 @@ todo_list parse_file(const string& file_path, string_vector lines) {
 		    break;
 	    }
 	    item.line_text = line;
-	    item.line_no = i;
+	    item.line_no = i + 1;
 	    item.level = level;
 	    item.file_path = file_path;
 	    todo_items.push_back(item);
@@ -94,8 +97,20 @@ void sort_todo_list(todo_list& todo_items) {
 // get a list of all files in a directory
 string_vector get_files(const string& dir) {
 	string_vector files;
-	for (const auto& entry : filesystem::directory_iterator(dir)) {
-		files.push_back(entry.path().string());
+	// getting recursive directory listing was easy LMAO
+	for (const auto& entry : filesystem::recursive_directory_iterator(dir)) {
+		
+		// check if the file is a regular file 
+		if (filesystem::is_regular_file(entry.path())) {
+			if (entry.path().extension() != ".out" && 
+					entry.path().extension() != ".exe" && 
+					entry.path().extension() != ".bin" &&
+					entry.path().extension() != "") {
+				files.push_back(entry.path().string());
+			}
+		}
+		
+		//files.push_back(entry.path().string());
 	}
 	return files;
 }
@@ -117,6 +132,57 @@ void render_terminal(const string& dir, const string& ext)
 			cout << item.level << ":" << item.file_path << ":" << item.line_no << ": " << item.line_text << endl;
 		}
 	}
+}
+
+// makes it look pretty
+void render_termTab(const string& dir, const string& ext)
+{
+	string_vector files = get_files(dir);
+
+	Table prog_table;
+	prog_table.add_row({"Level", "Name", "Line", "Line Data"});
+	for (const auto& file : files) {
+		if (ext.compare("*") == 0) 
+			goto handle;
+		else if (file.find(ext) == string::npos) 
+			continue;
+
+		handle:
+		string_vector lines = read_file(file);
+		todo_list todo_items = parse_file(file, lines);
+		sort_todo_list(todo_items);
+		for (const auto& item : todo_items) {
+			prog_table.add_row({to_string(item.level), item.file_path, to_string(item.line_no), item.line_text});
+		}
+	}
+
+	prog_table.column(0).format()
+		.font_align(FontAlign::right)
+		.font_color(Color::red)
+		.font_style({FontStyle::bold});
+
+	prog_table.column(1).format()
+		.font_align(FontAlign::right)
+		.font_color(Color::blue)
+		.font_style({FontStyle::bold});
+
+	prog_table.column(2).format()
+		.font_align(FontAlign::left)
+		.font_color(Color::grey)
+		.font_style({FontStyle::bold});
+
+	prog_table.column(3).format()
+		.font_align(FontAlign::left)
+		.font_color(Color::green)
+		.font_style({FontStyle::bold});
+
+	for (size_t i = 0; i < 4; i++) {
+		prog_table[0][i].format()
+			.font_color(Color::yellow)
+			.font_align(FontAlign::center)
+			.font_style({FontStyle::bold});
+	}
+	cout << prog_table << endl;
 }
 
 
@@ -148,7 +214,8 @@ int main ( int argc, char *argv[] )
 	}
 	while (isRunning) {
 		clear();
-		render_terminal(dir, ext);
+		render_termTab(dir, ext);
+		//render_terminal(dir, ext);
 		sleep(1);
 	}
 }
