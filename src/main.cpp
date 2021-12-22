@@ -15,9 +15,11 @@ using Row_t = Table::Row_t;
 #ifdef _WIN32
  // clear console
  #define clear() system("cls")
+ #define UPDATE_TIME 5
 #elif __linux__
  // clear console
  #define clear() system("clear")
+ #define UPDATE_TIME 1
 #endif
 
 typedef vector<string> string_vector;
@@ -36,7 +38,6 @@ typedef vector<todo_item> todo_list;
 void sleep(const int& seconds) {
 	this_thread::sleep_for(chrono::seconds(seconds));
 }
-// TODO: test
 // Read function
 string_vector read_file(string filename) {
     string_vector lines;
@@ -51,11 +52,10 @@ string_vector read_file(string filename) {
     return lines;
 }
 
-// TODOOOOOOO: TEST
 bool isCommented(const string& line) {
     return line.find("//") != string::npos || line.find("#") != string::npos;
 }
-// TODO: test2
+
 todo_list parse_file(const string& file_path, string_vector lines) {
     todo_list todo_items;
     for (int i = 0; i < lines.size(); i++) {
@@ -88,12 +88,12 @@ todo_list parse_file(const string& file_path, string_vector lines) {
 }
 
 // sort the todo_list by level
-void sort_todo_list(todo_list& todo_items) {
+todo_list sort_todo_list(todo_list todo_items) {
     sort(todo_items.begin(), todo_items.end(), [](const todo_item& a, const todo_item& b) {
 	return a.level > b.level;
     });
+    return todo_items;
 }
-
 // get a list of all files in a directory
 string_vector get_files(const string& dir) {
 	string_vector files;
@@ -127,20 +127,19 @@ void render_terminal(const string& dir, const string& ext)
 		handle:
 		string_vector lines = read_file(file);
 		todo_list todo_items = parse_file(file, lines);
-		sort_todo_list(todo_items);
+		todo_items = sort_todo_list(todo_items);
 		for (const auto& item : todo_items) {
 			cout << item.level << ":" << item.file_path << ":" << item.line_no << ": " << item.line_text << endl;
 		}
 	}
 }
-
 // makes it look pretty
-void render_termTab(const string& dir, const string& ext)
+Table render_termTab(const string& dir, const string& ext)
 {
 	string_vector files = get_files(dir);
 
 	Table prog_table;
-	prog_table.add_row({"Level", "Name", "Line", "Line Data"});
+	prog_table.add_row({"Level", "Name", "Line #", "Line Data"});
 	for (const auto& file : files) {
 		if (ext.compare("*") == 0) 
 			goto handle;
@@ -150,7 +149,7 @@ void render_termTab(const string& dir, const string& ext)
 		handle:
 		string_vector lines = read_file(file);
 		todo_list todo_items = parse_file(file, lines);
-		sort_todo_list(todo_items);
+		todo_items = sort_todo_list(todo_items);
 		for (const auto& item : todo_items) {
 			prog_table.add_row({to_string(item.level), item.file_path, to_string(item.line_no), item.line_text});
 		}
@@ -168,7 +167,7 @@ void render_termTab(const string& dir, const string& ext)
 
 	prog_table.column(2).format()
 		.font_align(FontAlign::left)
-		.font_color(Color::grey)
+		.font_color(Color::cyan)
 		.font_style({FontStyle::bold});
 
 	prog_table.column(3).format()
@@ -182,9 +181,9 @@ void render_termTab(const string& dir, const string& ext)
 			.font_align(FontAlign::center)
 			.font_style({FontStyle::bold});
 	}
-	cout << prog_table << endl;
+	return prog_table;
+	//cout << prog_table << endl;
 }
-
 
 int main ( int argc, char *argv[] )
 {
@@ -212,10 +211,14 @@ int main ( int argc, char *argv[] )
 	} catch (const bad_any_cast& e){
 		cout << "No extension specified" << endl;
 	}
+	// todoo: find the best time for the sleep
 	while (isRunning) {
+		// This just makes the writing take place
+		// after the tab is rendered and then clears and prints
+		Table table = render_termTab(dir, ext);
 		clear();
-		render_termTab(dir, ext);
+		cout << table << endl;
 		//render_terminal(dir, ext);
-		sleep(1);
+		sleep(UPDATE_TIME);
 	}
 }
